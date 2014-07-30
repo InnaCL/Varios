@@ -5989,8 +5989,12 @@ void CHARACTER::GiveRandomSkillBook()
 
 void CHARACTER::ReviveInvisible(int iDur)
 {
-	AddAffect(AFFECT_REVIVE_INVISIBLE, POINT_NONE, 0, AFF_REVIVE_INVISIBLE, iDur, 0, true);
-}
+	/*Reparamos Invisiblidad al Nacer*/
+	
+	//AddAffect(AFFECT_REVIVE_INVISIBLE, POINT_NONE, 0, AFF_REVIVE_INVISIBLE, iDur, 0, true);
+	AddAffect(AFFECT_INVISIBILITY, POINT_NONE, 0, AFF_REVIVE_INVISIBLE, iDur, 0, true);
+	
+	}
 
 void CHARACTER::ToggleMonsterLog()
 {
