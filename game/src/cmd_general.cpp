@@ -2365,7 +2365,11 @@ ACMD(do_in_game_mall)
 		char buf[512+1];
 		char sas[33];
 		MD5_CTX ctx;
-		const char sas_key[] = "GF9001";
+		/*****************************************************
+		Cambiamos el sas_key por otro para tener más seguridad
+		*******************************************************/
+		//const char sas_key[] = "GF9001";
+		const char sas_key[] = "DR7666";
 
 		snprintf(buf, sizeof(buf), "%u%u%s", ch->GetPlayerID(), ch->GetAID(), sas_key);
 

@@ -736,7 +736,9 @@ int CInputMain::Chat(LPCHARACTER ch, const char * data, size_t uiBytes)
 			return (iExtraLen);
 
 		ch->SetLastShoutPulse(thecore_heart->pulse);
-
+		/*****************
+			CHAT GLOBAL
+		*****************/
 		const char* kingdoms[3] = { "|cFFff0000|H|h[Shinsoo]|cFFA7FFD4|H|h", "|cFFFFFF00|H|h[Chunjo]|cFFA7FFD4|H|h", "|cFF0080FF|H|h[Jinno]|cFFA7FFD4|H|h" };
 		char chatbuf_global[CHAT_MAX_LEN + 1];
 		int len_global = snprintf(chatbuf_global, sizeof(chatbuf_global), "%s %s", kingdoms[ch->GetEmpire() - 1], chatbuf);
@@ -747,6 +749,18 @@ int CInputMain::Chat(LPCHARACTER ch, const char * data, size_t uiBytes)
 		strlcpy(p.szText, chatbuf_global, len_global);
 		P2P_MANAGER::instance().Send(&p, sizeof(TPacketGGShout));
 		SendShout(chatbuf_global, ch->GetEmpire());
+		/*****************
+	     SIN CHAT GLOBAL
+		*****************/
+		/*TPacketGGShout p;
+
+		p.bHeader = HEADER_GG_SHOUT;
+		p.bEmpire = ch->GetEmpire();
+		strlcpy(p.szText, chatbuf, sizeof(p.szText));
+
+		P2P_MANAGER::instance().Send(&p, sizeof(TPacketGGShout));
+
+		SendShout(chatbuf, ch->GetEmpire());*/
 
 		return (iExtraLen);
 	}

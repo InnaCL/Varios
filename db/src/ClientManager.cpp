@@ -4365,7 +4365,12 @@ void CClientManager::ChargeCash(const TRequestChargeCash* packet)
 	char szQuery[512];
 
 	if (ERequestCharge_Cash == packet->eChargeType)
-		sprintf(szQuery, "update account set `cash` = `cash` + %d where id = %d limit 1", packet->dwAmount, packet->dwAID);
+						/*********************************************************************
+						Cambiamos la query, para que ingrese en la tabla coins, y no en cash.
+						*********************************************************************/
+		// sprintf(szQuery, "update account set `cash` = `cash` + %d where id = %d limit 1", packet->dwAmount, packet->dwAID);
+		sprintf(szQuery, "update account set `coins` = `coins` + %d where id = %d limit 1", packet->dwAmount, packet->dwAID);
+		
 	else if(ERequestCharge_Mileage == packet->eChargeType)
 		sprintf(szQuery, "update account set `mileage` = `mileage` + %d where id = %d limit 1", packet->dwAmount, packet->dwAID);
 	else

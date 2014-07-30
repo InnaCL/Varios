@@ -12,6 +12,10 @@ enum EMisc
 	ACCOUNT_STATUS_MAX_LEN	= 8,
 	CHARACTER_NAME_MAX_LEN	= 24,
 	SHOP_SIGN_MAX_LEN		= 32,
+	//INVENTORY_MAX_NUM		= 90,
+	/*************************
+	INVENTARIO 4 Paginas
+	**************************/
 	INVENTORY_MAX_NUM		= 180,
 
 	ABILITY_MAX_NUM			= 50,

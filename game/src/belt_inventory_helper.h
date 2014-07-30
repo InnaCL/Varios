@@ -87,17 +87,22 @@ public:
 	static bool CanMoveIntoBeltInventory(LPITEM item)
 	{
 		bool canMove = false;
+		//Añado que pueda ponerse Autopots en inventario.
+		if (item->GetVnum() >= 72723 && item->GetVnum() <= 72730)
+		{
+			canMove = true;
+		}
 
 		if (item->GetType() == ITEM_USE)
 		{
-			switch (item->GetSubType())
-			{
+		    switch (item->GetSubType())
+			{			
 			case USE_POTION:
 			case USE_POTION_NODELAY:
 			case USE_ABILITY_UP:
 				canMove = true;
 				break;
-			}
+			}			
 		}
 
 		return canMove;

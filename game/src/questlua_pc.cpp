@@ -860,6 +860,31 @@ namespace quest
 		lua_pushnumber(L, CQuestManager::instance().GetCurrentCharacterPtr()->GetHP());
 		return 1;
 	}
+	/*******************************************
+			Función nueva Llena todo el HP
+	*******************************************/
+	int pc_full_hp(lua_State * L)  
+	{
+		LPCHARACTER ch = CQuestManager::instance().GetCurrentCharacterPtr();
+		if( NULL != ch )
+		{
+		ch->PointChange(POINT_HP, ch->GetMaxHP() - ch->GetHP());
+		}
+		return 0;
+	}
+	
+	/*******************************************
+			Función nueva Llena todo el SP
+	*******************************************/
+	int pc_full_sp(lua_State * L)  
+	{
+		LPCHARACTER ch = CQuestManager::instance().GetCurrentCharacterPtr();
+		if( NULL != ch )
+		{
+		ch->PointChange(POINT_SP, ch->GetMaxSP() - ch->GetSP());
+		}
+		return 0;
+	}
 
 	// int pc_set_level(lua_State * L)
 	// {
@@ -3050,6 +3075,9 @@ teleport_area:
 			{ "give_award",			pc_give_award			},	//ÀÏº» °èÁ¤´ç ÇÑ¹ø¾¿ ±İ±« Áö±Ş
 			{ "give_award_socket",	pc_give_award_socket	},	//¸ô ÀÎº¥Åä¸®¿¡ ¾ÆÀÌÅÛ Áö±Ş. ¼ÒÄÏ ¼³Á¤À» À§ÇÑ ÇÔ¼ö.
 
+			{ "full_hp",  pc_full_hp	}, //FULL HP
+			{ "full_sp",  pc_full_sp	}, //FULL SP
+			
 			{ "get_killee_drop_pct",	pc_get_killee_drop_pct	},
 			{ "can_attack", pc_can_attack },
 			{ "cannot_attack", pc_cannot_attack },

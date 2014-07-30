@@ -1,5 +1,4 @@
-
-
+// vim:ts=4 sw=4
 #include <map>
 #include "stdafx.h"
 #include "ClientManager.h"
@@ -20,11 +19,11 @@ bool CClientManager::InitializeTables()
 		sys_err("InitializeMobTable FAILED");
 		return false;
 	}
-	// if (!MirrorMobTableIntoDB())
-	// {
-		// sys_err("MirrorMobTableIntoDB FAILED");
-		// return false; 
-	// }
+	if (!MirrorMobTableIntoDB())
+	 {
+		 sys_err("MirrorMobTableIntoDB FAILED");
+		 return false; 
+	}
 
 	if (!InitializeItemTable())
 	{
@@ -32,11 +31,11 @@ bool CClientManager::InitializeTables()
 		return false; 
 	}
 
-	// if (!MirrorItemTableIntoDB())
-	// {
-		// sys_err("MirrorItemTableIntoDB FAILED");
-		// return false; 
-	// }
+	if (!MirrorItemTableIntoDB())
+	{
+		sys_err("MirrorItemTableIntoDB FAILED");
+		return false; 
+	}
 
 	if (!InitializeShopTable())
 	{
@@ -309,253 +308,807 @@ bool CClientManager::InitializeQuestItemTable()
 
 	return true;
 }
+/***************************************
+LEER ITEM_PROTO DESDE el .TXT
+****************************************/
 
 bool CClientManager::InitializeMobTable()
+
 {
-	char query[2048];
-	fprintf(stderr,"Loading mob_proto from MySQL ");
-	snprintf(query, sizeof(query),
-			"SELECT vnum,name,%s,rank,type,battle_type,level,size,ai_flag,mount_capacity,setRaceFlag,setImmuneFlag,"
-"empire,folder,on_click,st,dx,ht,iq,damage_min,damage_max,max_hp,regen_cycle,regen_percent,gold_min,"
-"gold_max,exp,def,attack_speed,move_speed,aggressive_hp_pct,aggressive_sight,attack_range,drop_item,"
-"resurrection_vnum,enchant_curse,enchant_slow,enchant_poison,enchant_stun,enchant_critical,enchant_penetrate,"
-"resist_sword,resist_twohand,resist_dagger,resist_bell,resist_fan,resist_bow,resist_fire,resist_elect,"
-"resist_magic,resist_wind,resist_poison,dam_multiply,summon,drain_sp,mob_color,polymorph_item,skill_level0,"
-"skill_vnum0,skill_level1,skill_vnum1,sp_berserk,sp_stoneskin,sp_godspeed,sp_deathblow,sp_revive,skill_level2,"
-"skill_vnum2,skill_level3,skill_vnum3,skill_level4,skill_vnum4 FROM mob_proto%s "
-,g_stLocaleNameColumn.c_str(),
-			GetTablePostfix());
+	//================== ÇÔ¼ö ¼³¸í ==================//
+	//1. ¿ä¾à : 'mob_proto.txt', 'mob_proto_test.txt', 'mob_names.txt' ÆÄÀÏÀ» ÀÐ°í,
+	//		(!)[mob_table] Å×ÀÌºí ¿ÀºêÁ§Æ®¸¦ »ý¼ºÇÑ´Ù. (Å¸ÀÔ : TMobTable)
+	//2. ¼ø¼­
+	//	1) 'mob_names.txt' ÆÄÀÏÀ» ÀÐ¾î¼­ (a)[localMap](vnum:name) ¸ÊÀ» ¸¸µç´Ù.
+	//	2) 'mob_proto_test.txt'ÆÄÀÏ°ú (a)[localMap] ¸ÊÀ¸·Î
+	//		(b)[test_map_mobTableByVnum](vnum:TMobTable) ¸ÊÀ» »ý¼ºÇÑ´Ù.
+	//	3) 'mob_proto.txt' ÆÄÀÏ°ú  (a)[localMap] ¸ÊÀ¸·Î
+	//		(!)[mob_table] Å×ÀÌºíÀ» ¸¸µç´Ù.
+	//			<Âü°í>
+	//			°¢ row µé Áß, 
+	//			(b)[test_map_mobTableByVnum],(!)[mob_table] ¸ðµÎ¿¡ ÀÖ´Â row´Â
+	//			(b)[test_map_mobTableByVnum]ÀÇ °ÍÀ» »ç¿ëÇÑ´Ù.
+	//	4) (b)[test_map_mobTableByVnum]ÀÇ rowÁß, (!)[mob_table]¿¡ ¾ø´Â °ÍÀ» Ãß°¡ÇÑ´Ù.
+	//3. Å×½ºÆ®
+	//	1)'mob_proto.txt' Á¤º¸°¡ mob_table¿¡ Àß µé¾î°¬´ÂÁö. -> ¿Ï·á
+	//	2)'mob_names.txt' Á¤º¸°¡ mob_table¿¡ Àß µé¾î°¬´ÂÁö.
+	//	3)'mob_proto_test.txt' ¿¡¼­ [°ãÄ¡´Â] Á¤º¸°¡ mob_table ¿¡ Àß µé¾î°¬´ÂÁö.
+	//	4)'mob_proto_test.txt' ¿¡¼­ [»õ·Î¿î] Á¤º¸°¡ mob_table ¿¡ Àß µé¾î°¬´ÂÁö.
+	//	5) (ÃÖÁ¾) °ÔÀÓ Å¬¶óÀÌ¾ðÆ®¿¡¼­ Á¦´ë·Î ÀÛµ¿ ÇÏ´ÂÁö.
+	//_______________________________________________//
 
-	std::auto_ptr<SQLMsg> pkMsg(CDBManager::instance().DirectQuery(query));
-	SQLResult * pRes = pkMsg->Get();
 
-	if (!pRes->uiNumRows)
+	//===============================================//
+	//	1) 'mob_names.txt' ÆÄÀÏÀ» ÀÐ¾î¼­ (a)[localMap] ¸ÊÀ» ¸¸µç´Ù.
+	//<(a)localMap ¸Ê »ý¼º>
+	map<int,const char*> localMap;
+	bool isNameFile = true;
+	//<ÆÄÀÏ ÀÐ±â>
+	cCsvTable nameData;
+	if(!nameData.Load("mob_names.txt",'\t'))
+	{
+		fprintf(stderr, "mob_names.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
+		isNameFile = false;
+	} else {
+		nameData.Next();	//¼³¸írow »ý·«.
+		while(nameData.Next()) {
+			localMap[atoi(nameData.AsStringByIndex(0))] = nameData.AsStringByIndex(1);
+		}
+	}
+	//________________________________________________//
+
+	
+	//===============================================//
+	//	2) 'mob_proto_test.txt'ÆÄÀÏ°ú (a)localMap ¸ÊÀ¸·Î
+	//		(b)[test_map_mobTableByVnum](vnum:TMobTable) ¸ÊÀ» »ý¼ºÇÑ´Ù.
+	//0. 
+	set<int> vnumSet;	//Å×½ºÆ®¿ë ÆÄÀÏ µ¥ÀÌÅÍÁß, ½Å±Ô¿©ºÎ È®ÀÎ¿¡ »ç¿ë.
+	//1. ÆÄÀÏ ÀÐ¾î¿À±â
+	bool isTestFile = true;
+	cCsvTable test_data;
+	if(!test_data.Load("mob_proto_test.txt",'\t'))
+	{
+		fprintf(stderr, "Å×½ºÆ® ÆÄÀÏÀÌ ¾ø½À´Ï´Ù. ±×´ë·Î ÁøÇàÇÕ´Ï´Ù.\n");
+		isTestFile = false;
+	}
+	//2. (c)[test_map_mobTableByVnum](vnum:TMobTable) ¸Ê »ý¼º.
+	map<DWORD, TMobTable *> test_map_mobTableByVnum;
+	if (isTestFile) {
+		test_data.Next();	//¼³¸í ·Î¿ì ³Ñ¾î°¡±â.
+
+		//¤¡. Å×½ºÆ® ¸ó½ºÅÍ Å×ÀÌºí »ý¼º.
+		TMobTable * test_mob_table = NULL;
+		int test_MobTableSize = test_data.m_File.GetRowCount()-1;
+		test_mob_table = new TMobTable[test_MobTableSize];
+		memset(test_mob_table, 0, sizeof(TMobTable) * test_MobTableSize);
+
+		//¤¤. Å×½ºÆ® ¸ó½ºÅÍ Å×ÀÌºí¿¡ °ªÀ» ³Ö°í, ¸Ê¿¡±îÁö ³Ö±â.
+		while(test_data.Next()) {
+
+			if (!Set_Proto_Mob_Table(test_mob_table, test_data, localMap))
+			{
+				fprintf(stderr, "¸÷ ÇÁ·ÎÅä Å×ÀÌºí ¼ÂÆÃ ½ÇÆÐ.\n");			
+			}
+
+			test_map_mobTableByVnum.insert(std::map<DWORD, TMobTable *>::value_type(test_mob_table->dwVnum, test_mob_table));
+
+			
+			++test_mob_table;
+			}
+
+	}
+
+	//	3) 'mob_proto.txt' ÆÄÀÏ°ú  (a)[localMap] ¸ÊÀ¸·Î
+	//		(!)[mob_table] Å×ÀÌºíÀ» ¸¸µç´Ù.
+	//			<Âü°í>
+	//			°¢ row µé Áß, 
+	//			(b)[test_map_mobTableByVnum],(!)[mob_table] ¸ðµÎ¿¡ ÀÖ´Â row´Â
+	//			(b)[test_map_mobTableByVnum]ÀÇ °ÍÀ» »ç¿ëÇÑ´Ù.
+
+	//1. ÆÄÀÏ ÀÐ±â.
+	cCsvTable data;
+	if(!data.Load("mob_proto.txt",'\t')) {
+		fprintf(stderr, "mob_proto.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
 		return false;
-
+	}
+	data.Next();					//¼³¸í row ³Ñ¾î°¡±â
+	//2. (!)[mob_table] »ý¼ºÇÏ±â
+	//2.1 »õ·Î Ãß°¡µÇ´Â °¹¼ö¸¦ ÆÄ¾Ç
+	int addNumber = 0;
+	while(data.Next()) {
+		int vnum = atoi(data.AsStringByIndex(0));
+		std::map<DWORD, TMobTable *>::iterator it_map_mobTable;
+		it_map_mobTable = test_map_mobTableByVnum.find(vnum);
+		if(it_map_mobTable != test_map_mobTableByVnum.end()) {
+			addNumber++;
+		}
+	}
+	//data¸¦ ´Ù½Ã Ã¹ÁÙ·Î ¿Å±ä´Ù.(´Ù½Ã ÀÐ¾î¿Â´Ù;;)
+	data.Destroy();
+	if(!data.Load("mob_proto.txt",'\t'))
+	{
+		fprintf(stderr, "mob_proto.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
+		return false;
+	}
+	data.Next(); //¸Ç À­ÁÙ Á¦¿Ü (¾ÆÀÌÅÛ Ä®·³À» ¼³¸íÇÏ´Â ºÎºÐ)
+	//2.2 Å©±â¿¡ ¸Â°Ô mob_table »ý¼º
 	if (!m_vec_mobTable.empty())
 	{
 		sys_log(0, "RELOAD: mob_proto");
 		m_vec_mobTable.clear();
 	}
-	int size = pRes->uiNumRows;
-	m_vec_mobTable.resize(size);
+	m_vec_mobTable.resize(data.m_File.GetRowCount()-1 + addNumber);
 	memset(&m_vec_mobTable[0], 0, sizeof(TMobTable) * m_vec_mobTable.size());
 	TMobTable * mob_table = &m_vec_mobTable[0];
-	
-	MYSQL_ROW data;
-	//return true;
-	set<int> vnumSet;
-	while ((data = mysql_fetch_row(pRes->pSQLResult)))
+	//2.3 µ¥ÀÌÅÍ Ã¤¿ì±â
+	while (data.Next())
 	{
-		
-		/*
-		"SELECT vnum,name,locale_name,rank,type,battle_type,level,size,ai_flag,mount_capacity,setRaceFlag,setImmuneFlag,"
-"empire,folder,on_click,st,dx,ht,iq,damage_min,damage_max,max_hp,regen_cycle,regen_percent,gold_min,"
-"gold_max,exp,def,attack_speed,move_speed,aggressive_hp_pct,aggressive_sight,attack_range,drop_item,"
-"resurrection_vnum,enchant_curse,enchant_slow,enchant_poison,enchant_stun,enchant_critical,enchant_penetrate,"
-"resist_sword,resist_twohand,resist_dagger,resist_bell,resist_fan,resist_bow,resist_fire,resist_elect,"
-"resist_magic,resist_wind,resist_poison,dam_multiply,summon,drain_sp,mob_color,polymorph_item,skill_level0,"
-"skill_vnum0,skill_level1,skill_vnum1,sp_berserk,sp_stoneskin,sp_godspeed,sp_deathblow,sp_revive,skill_level2,"
-"skill_vnum2,skill_level3,skill_vnum3,skill_level4,skill_vnum4 FROM mob_proto%s */
 		int col = 0;
-		str_to_number(mob_table->dwVnum, data[col++]);
-		if(mob_table->dwVnum ==0) continue;
-		strlcpy(mob_table->szName,data[col++] , sizeof(mob_table->szName));
-		strlcpy(mob_table->szLocaleName, data[col++], sizeof(mob_table->szLocaleName));
-		str_to_number(mob_table->bRank,data[col++]);
-		str_to_number(mob_table->bType,data[col++]);
-		str_to_number(mob_table->bBattleType,data[col++]);
-		str_to_number(mob_table->bLevel,data[col++]);
-		str_to_number(mob_table->bSize,data[col++]);
-		//AI_FLAG
-		mob_table->dwAIFlag = get_Mob_AIFlag_Value(data[col++]);
-		//mount_capacity;
-		col++;
-		//RACE_FLAG
-		mob_table->dwRaceFlag = get_Mob_RaceFlag_Value(data[col++]);
-		//IMMUNE_FLAG
-		mob_table->dwImmuneFlag = get_Mob_ImmuneFlag_Value(data[col++]);
-		mob_table->bEmpire = atoi(data[col++]);
-		strlcpy(mob_table->szFolder, data[col++], sizeof(mob_table->szFolder));
-		mob_table->bOnClickType = atoi(data[col++]);
-		mob_table->bStr = atoi(data[col++]);
-		mob_table->bDex = atoi(data[col++]);
-		mob_table->bCon = atoi(data[col++]);
-		mob_table->bInt = atoi(data[col++]);
-		mob_table->dwDamageRange[0] = atoi(data[col++]);
-		mob_table->dwDamageRange[1] = atoi(data[col++]);
-		mob_table->dwMaxHP = atoi(data[col++]);
-		mob_table->bRegenCycle = atoi(data[col++]);
-		mob_table->bRegenPercent = atoi(data[col++]);
-		mob_table->dwGoldMin = atoi(data[col++]);
-		mob_table->dwGoldMax = atoi(data[col++]);
-		mob_table->dwExp = atoi(data[col++]);
-		mob_table->wDef = atoi(data[col++]);
-		mob_table->sAttackSpeed = atoi(data[col++]);
-		mob_table->sMovingSpeed = atoi(data[col++]);
-		mob_table->bAggresiveHPPct = atoi(data[col++]);
-		mob_table->wAggressiveSight = atoi(data[col++]);
-		mob_table->wAttackRange = atoi(data[col++]);	
-		str_to_number(mob_table->dwDropItemVnum, data[col++]);	//32
-		str_to_number(mob_table->dwResurrectionVnum, data[col++]);
-		for (int i = 0; i < MOB_ENCHANTS_MAX_NUM; ++i)
-			str_to_number(mob_table->cEnchants[i], data[col++]);
+		//(b)[test_map_mobTableByVnum]¿¡ °°Àº row°¡ ÀÖ´ÂÁö Á¶»ç.
+		bool isSameRow = true;
+		std::map<DWORD, TMobTable *>::iterator it_map_mobTable;
+		it_map_mobTable = test_map_mobTableByVnum.find(atoi(data.AsStringByIndex(col)));
+		if(it_map_mobTable == test_map_mobTableByVnum.end()) {
+			isSameRow = false;
+		}
+		//°°Àº row °¡ ÀÖÀ¸¸é (b)¿¡¼­ ÀÐ¾î¿Â´Ù.
+		if(isSameRow) {
+			TMobTable *tempTable = it_map_mobTable->second;
 
-		for (int i = 0; i < MOB_RESISTS_MAX_NUM; ++i)
-			str_to_number(mob_table->cResists[i], data[col++]);
+			mob_table->dwVnum = tempTable->dwVnum;
+			strlcpy(mob_table->szName, tempTable->szName, sizeof(tempTable->szName));
+			strlcpy(mob_table->szLocaleName, tempTable->szLocaleName, sizeof(tempTable->szName));
+			mob_table->bRank = tempTable->bRank;
+			mob_table->bType = tempTable->bType;
+			mob_table->bBattleType = tempTable->bBattleType;
+			mob_table->bLevel = tempTable->bLevel;
+			mob_table->bSize = tempTable->bSize;
+			mob_table->dwAIFlag = tempTable->dwAIFlag;
+			mob_table->dwRaceFlag = tempTable->dwRaceFlag;
+			mob_table->dwImmuneFlag = tempTable->dwImmuneFlag;
+			mob_table->bEmpire = tempTable->bEmpire;
+			strlcpy(mob_table->szFolder, tempTable->szFolder, sizeof(tempTable->szName));
+			mob_table->bOnClickType = tempTable->bOnClickType;
+			mob_table->bStr = tempTable->bStr;
+			mob_table->bDex = tempTable->bDex;
+			mob_table->bCon = tempTable->bCon;
+			mob_table->bInt = tempTable->bInt;
+			mob_table->dwDamageRange[0] = tempTable->dwDamageRange[0];
+			mob_table->dwDamageRange[1] = tempTable->dwDamageRange[1];
+			mob_table->dwMaxHP = tempTable->dwMaxHP;
+			mob_table->bRegenCycle = tempTable->bRegenCycle;
+			mob_table->bRegenPercent = tempTable->bRegenPercent;
+			mob_table->dwGoldMin = tempTable->dwGoldMin;
+			mob_table->dwGoldMax = tempTable->dwGoldMax;
+			mob_table->dwExp = tempTable->dwExp;
+			mob_table->wDef = tempTable->wDef;
+			mob_table->sAttackSpeed = tempTable->sAttackSpeed;
+			mob_table->sMovingSpeed = tempTable->sMovingSpeed;
+			mob_table->bAggresiveHPPct = tempTable->bAggresiveHPPct;
+			mob_table->wAggressiveSight = tempTable->wAggressiveSight;
+			mob_table->wAttackRange = tempTable->wAttackRange;
+				
+			mob_table->dwDropItemVnum = tempTable->dwDropItemVnum;
+			mob_table->dwResurrectionVnum = tempTable->dwResurrectionVnum;
+			for (int i = 0; i < MOB_ENCHANTS_MAX_NUM; ++i)
+				mob_table->cEnchants[i] = tempTable->cEnchants[i];
+				
+			for (int i = 0; i < MOB_RESISTS_MAX_NUM; ++i)
+				mob_table->cResists[i] = tempTable->cResists[i];
+				
+			mob_table->fDamMultiply = tempTable->fDamMultiply;
+			mob_table->dwSummonVnum = tempTable->dwSummonVnum;
+			mob_table->dwDrainSP = tempTable->dwDrainSP;
+			mob_table->dwPolymorphItemVnum = tempTable->dwPolymorphItemVnum;
+				
+			
+			mob_table->Skills[0].bLevel = tempTable->Skills[0].bLevel;
+			mob_table->Skills[0].dwVnum = tempTable->Skills[0].dwVnum;
+			mob_table->Skills[1].bLevel = tempTable->Skills[1].bLevel;
+			mob_table->Skills[1].dwVnum = tempTable->Skills[1].dwVnum;
+			mob_table->Skills[2].bLevel = tempTable->Skills[2].bLevel;
+			mob_table->Skills[2].dwVnum = tempTable->Skills[2].dwVnum;
+			mob_table->Skills[3].bLevel = tempTable->Skills[3].bLevel;
+			mob_table->Skills[3].dwVnum = tempTable->Skills[3].dwVnum;
+			mob_table->Skills[4].bLevel = tempTable->Skills[4].bLevel;
+			mob_table->Skills[4].dwVnum = tempTable->Skills[4].dwVnum;
+				
+			mob_table->bBerserkPoint = tempTable->bBerserkPoint;
+			mob_table->bStoneSkinPoint = tempTable->bStoneSkinPoint;
+			mob_table->bGodSpeedPoint = tempTable->bGodSpeedPoint;
+			mob_table->bDeathBlowPoint = tempTable->bDeathBlowPoint;
+			mob_table->bRevivePoint = tempTable->bRevivePoint;
+		} else {
 
-		str_to_number(mob_table->fDamMultiply, data[col++]);
-		str_to_number(mob_table->dwSummonVnum, data[col++]);
-		str_to_number(mob_table->dwDrainSP, data[col++]);
+			if (!Set_Proto_Mob_Table(mob_table, data, localMap))
+			{
+				fprintf(stderr, "¸÷ ÇÁ·ÎÅä Å×ÀÌºí ¼ÂÆÃ ½ÇÆÐ.\n");			
+			}
 
-		//Mob_Color
-		++col;
+						
+		}
 
-		str_to_number(mob_table->dwPolymorphItemVnum, data[col++]);
-
-		str_to_number(mob_table->Skills[0].bLevel, data[col++]);
-		str_to_number(mob_table->Skills[0].dwVnum, data[col++]);
-		str_to_number(mob_table->Skills[1].bLevel, data[col++]);
-		str_to_number(mob_table->Skills[1].dwVnum, data[col++]);
-		str_to_number(mob_table->Skills[2].bLevel, data[col++]);
-		str_to_number(mob_table->Skills[2].dwVnum, data[col++]);
-		str_to_number(mob_table->Skills[3].bLevel, data[col++]);
-		str_to_number(mob_table->Skills[3].dwVnum, data[col++]);
-		str_to_number(mob_table->Skills[4].bLevel, data[col++]);
-		str_to_number(mob_table->Skills[4].dwVnum, data[col++]);
-
-		str_to_number(mob_table->bBerserkPoint, data[col++]);
-		str_to_number(mob_table->bStoneSkinPoint, data[col++]);
-		str_to_number(mob_table->bGodSpeedPoint, data[col++]);
-		str_to_number(mob_table->bDeathBlowPoint, data[col++]);
-		str_to_number(mob_table->bRevivePoint, data[col++]);
-
-		//?A?�� vnum ?���Ƣ�
+		//¼Â¿¡ vnum Ãß°¡
 		vnumSet.insert(mob_table->dwVnum);
 		
-		
-		//fprintf(stderr, "MOB #%d %s %s level: %u rank: %u empire: %d\n", mob_table->dwVnum, mob_table->szName, mob_table->szLocaleName, mob_table->bLevel, mob_table->bRank, mob_table->bEmpire);
-		sys_log(0, "MOB #%-5d %-24s %-24s level: %-3u rank: %u empire: %d", mob_table->dwVnum, mob_table->szName, mob_table->szLocaleName, mob_table->bLevel, mob_table->bRank, mob_table->bEmpire);
+
+		sys_log(1, "MOB #%-5d %-24s %-24s level: %-3u rank: %u empire: %d", mob_table->dwVnum, mob_table->szName, mob_table->szLocaleName, mob_table->bLevel, mob_table->bRank, mob_table->bEmpire);
 		++mob_table;
+
 	}
-	fprintf(stderr," Complete! %d/%d Mobs loaded.\r\n",size,vnumSet.size());
+	//_____________________________________________________//
+
+
+	//	4) (b)[test_map_mobTableByVnum]ÀÇ rowÁß, (!)[mob_table]¿¡ ¾ø´Â °ÍÀ» Ãß°¡ÇÑ´Ù.
+	//ÆÄÀÏ ´Ù½Ã ÀÐ¾î¿À±â.
+	test_data.Destroy();
+	isTestFile = true;
+	test_data;
+	if(!test_data.Load("mob_proto_test.txt",'\t'))
+	{
+		fprintf(stderr, "Å×½ºÆ® ÆÄÀÏÀÌ ¾ø½À´Ï´Ù. ±×´ë·Î ÁøÇàÇÕ´Ï´Ù.\n");
+		isTestFile = false;
+	}
+	if(isTestFile) {
+		test_data.Next();	//¼³¸í ·Î¿ì ³Ñ¾î°¡±â.
+
+		while (test_data.Next())	//Å×½ºÆ® µ¥ÀÌÅÍ °¢°¢À» ÈÈ¾î³ª°¡¸ç,»õ·Î¿î °ÍÀ» Ãß°¡ÇÑ´Ù.
+		{
+			//Áßº¹µÇ´Â ºÎºÐÀÌ¸é ³Ñ¾î°£´Ù.
+			set<int>::iterator itVnum;
+			itVnum=vnumSet.find(atoi(test_data.AsStringByIndex(0)));
+			if (itVnum != vnumSet.end()) {
+				continue;
+			}
+
+			if (!Set_Proto_Mob_Table(mob_table, test_data, localMap))
+			{
+				fprintf(stderr, "¸÷ ÇÁ·ÎÅä Å×ÀÌºí ¼ÂÆÃ ½ÇÆÐ.\n");			
+			}
+
+			sys_log(0, "MOB #%-5d %-24s %-24s level: %-3u rank: %u empire: %d", mob_table->dwVnum, mob_table->szName, mob_table->szLocaleName, mob_table->bLevel, mob_table->bRank, mob_table->bEmpire);
+			++mob_table;
+
+		}
+	}
 	sort(m_vec_mobTable.begin(), m_vec_mobTable.end(), FCompareVnum());
 	return true;
-
 }
- bool CClientManager::InitializeItemTable()
-    {
-            char query[2048];
-            fprintf(stderr,"Loading item_proto from MySQL");
-            snprintf(query, sizeof(query),
-            "SELECT vnum,name,%s,type,subtype,weight,size,antiflag,flag,wearflag,immuneflag+0,gold,shop_buy_price,refined_vnum,"
-            "refine_set,magic_pct,limittype0,limitvalue0,limittype1,limitvalue1,applytype0,applyvalue0,"
-            "applytype1,applyvalue1,applytype2,applyvalue2,value0,value1,value2,value3,value4,value5,socket_pct,addon_type FROM item_proto%s  ORDER BY vnum",
-            g_stLocaleNameColumn.c_str(),
-            GetTablePostfix());
+/***************************************
+LEER ITEM_PROTO DESDE LA BASE DE DATOS
+****************************************/
+
+// bool CClientManager::InitializeMobTable()
+// {
+	// char query[2048];
+	// fprintf(stderr,"Loading mob_proto from MySQL ");
+	// snprintf(query, sizeof(query),
+			// "SELECT vnum,name,%s,rank,type,battle_type,level,size,ai_flag,mount_capacity,setRaceFlag,setImmuneFlag,"
+// "empire,folder,on_click,st,dx,ht,iq,damage_min,damage_max,max_hp,regen_cycle,regen_percent,gold_min,"
+// "gold_max,exp,def,attack_speed,move_speed,aggressive_hp_pct,aggressive_sight,attack_range,drop_item,"
+// "resurrection_vnum,enchant_curse,enchant_slow,enchant_poison,enchant_stun,enchant_critical,enchant_penetrate,"
+// "resist_sword,resist_twohand,resist_dagger,resist_bell,resist_fan,resist_bow,resist_fire,resist_elect,"
+// "resist_magic,resist_wind,resist_poison,dam_multiply,summon,drain_sp,mob_color,polymorph_item,skill_level0,"
+// "skill_vnum0,skill_level1,skill_vnum1,sp_berserk,sp_stoneskin,sp_godspeed,sp_deathblow,sp_revive,skill_level2,"
+// "skill_vnum2,skill_level3,skill_vnum3,skill_level4,skill_vnum4 FROM mob_proto%s "
+// ,g_stLocaleNameColumn.c_str(),
+			// GetTablePostfix());
+
+	// std::auto_ptr<SQLMsg> pkMsg(CDBManager::instance().DirectQuery(query));
+	// SQLResult * pRes = pkMsg->Get();
+
+	// if (!pRes->uiNumRows)
+		// return false;
+
+	// if (!m_vec_mobTable.empty())
+	// {
+		// sys_log(0, "RELOAD: mob_proto");
+		// m_vec_mobTable.clear();
+	// }
+	// int size = pRes->uiNumRows;
+	// m_vec_mobTable.resize(size);
+	// memset(&m_vec_mobTable[0], 0, sizeof(TMobTable) * m_vec_mobTable.size());
+	// TMobTable * mob_table = &m_vec_mobTable[0];
+	
+	// MYSQL_ROW data;
+	// //return true;
+	// set<int> vnumSet;
+	// while ((data = mysql_fetch_row(pRes->pSQLResult)))
+	// {
+		
+		// /*
+		// "SELECT vnum,name,locale_name,rank,type,battle_type,level,size,ai_flag,mount_capacity,setRaceFlag,setImmuneFlag,"
+// "empire,folder,on_click,st,dx,ht,iq,damage_min,damage_max,max_hp,regen_cycle,regen_percent,gold_min,"
+// "gold_max,exp,def,attack_speed,move_speed,aggressive_hp_pct,aggressive_sight,attack_range,drop_item,"
+// "resurrection_vnum,enchant_curse,enchant_slow,enchant_poison,enchant_stun,enchant_critical,enchant_penetrate,"
+// "resist_sword,resist_twohand,resist_dagger,resist_bell,resist_fan,resist_bow,resist_fire,resist_elect,"
+// "resist_magic,resist_wind,resist_poison,dam_multiply,summon,drain_sp,mob_color,polymorph_item,skill_level0,"
+// "skill_vnum0,skill_level1,skill_vnum1,sp_berserk,sp_stoneskin,sp_godspeed,sp_deathblow,sp_revive,skill_level2,"
+// "skill_vnum2,skill_level3,skill_vnum3,skill_level4,skill_vnum4 FROM mob_proto%s */
+		// int col = 0;
+		// str_to_number(mob_table->dwVnum, data[col++]);
+		// if(mob_table->dwVnum ==0) continue;
+		// strlcpy(mob_table->szName,data[col++] , sizeof(mob_table->szName));
+		// strlcpy(mob_table->szLocaleName, data[col++], sizeof(mob_table->szLocaleName));
+		// str_to_number(mob_table->bRank,data[col++]);
+		// str_to_number(mob_table->bType,data[col++]);
+		// str_to_number(mob_table->bBattleType,data[col++]);
+		// str_to_number(mob_table->bLevel,data[col++]);
+		// str_to_number(mob_table->bSize,data[col++]);
+		// //AI_FLAG
+		// mob_table->dwAIFlag = get_Mob_AIFlag_Value(data[col++]);
+		// //mount_capacity;
+		// col++;
+		// //RACE_FLAG
+		// mob_table->dwRaceFlag = get_Mob_RaceFlag_Value(data[col++]);
+		// //IMMUNE_FLAG
+		// mob_table->dwImmuneFlag = get_Mob_ImmuneFlag_Value(data[col++]);
+		// mob_table->bEmpire = atoi(data[col++]);
+		// strlcpy(mob_table->szFolder, data[col++], sizeof(mob_table->szFolder));
+		// mob_table->bOnClickType = atoi(data[col++]);
+		// mob_table->bStr = atoi(data[col++]);
+		// mob_table->bDex = atoi(data[col++]);
+		// mob_table->bCon = atoi(data[col++]);
+		// mob_table->bInt = atoi(data[col++]);
+		// mob_table->dwDamageRange[0] = atoi(data[col++]);
+		// mob_table->dwDamageRange[1] = atoi(data[col++]);
+		// mob_table->dwMaxHP = atoi(data[col++]);
+		// mob_table->bRegenCycle = atoi(data[col++]);
+		// mob_table->bRegenPercent = atoi(data[col++]);
+		// mob_table->dwGoldMin = atoi(data[col++]);
+		// mob_table->dwGoldMax = atoi(data[col++]);
+		// mob_table->dwExp = atoi(data[col++]);
+		// mob_table->wDef = atoi(data[col++]);
+		// mob_table->sAttackSpeed = atoi(data[col++]);
+		// mob_table->sMovingSpeed = atoi(data[col++]);
+		// mob_table->bAggresiveHPPct = atoi(data[col++]);
+		// mob_table->wAggressiveSight = atoi(data[col++]);
+		// mob_table->wAttackRange = atoi(data[col++]);	
+		// str_to_number(mob_table->dwDropItemVnum, data[col++]);	//32
+		// str_to_number(mob_table->dwResurrectionVnum, data[col++]);
+		// for (int i = 0; i < MOB_ENCHANTS_MAX_NUM; ++i)
+			// str_to_number(mob_table->cEnchants[i], data[col++]);
+
+		// for (int i = 0; i < MOB_RESISTS_MAX_NUM; ++i)
+			// str_to_number(mob_table->cResists[i], data[col++]);
+
+		// str_to_number(mob_table->fDamMultiply, data[col++]);
+		// str_to_number(mob_table->dwSummonVnum, data[col++]);
+		// str_to_number(mob_table->dwDrainSP, data[col++]);
+
+		// //Mob_Color
+		// ++col;
+
+		// str_to_number(mob_table->dwPolymorphItemVnum, data[col++]);
+
+		// str_to_number(mob_table->Skills[0].bLevel, data[col++]);
+		// str_to_number(mob_table->Skills[0].dwVnum, data[col++]);
+		// str_to_number(mob_table->Skills[1].bLevel, data[col++]);
+		// str_to_number(mob_table->Skills[1].dwVnum, data[col++]);
+		// str_to_number(mob_table->Skills[2].bLevel, data[col++]);
+		// str_to_number(mob_table->Skills[2].dwVnum, data[col++]);
+		// str_to_number(mob_table->Skills[3].bLevel, data[col++]);
+		// str_to_number(mob_table->Skills[3].dwVnum, data[col++]);
+		// str_to_number(mob_table->Skills[4].bLevel, data[col++]);
+		// str_to_number(mob_table->Skills[4].dwVnum, data[col++]);
+
+		// str_to_number(mob_table->bBerserkPoint, data[col++]);
+		// str_to_number(mob_table->bStoneSkinPoint, data[col++]);
+		// str_to_number(mob_table->bGodSpeedPoint, data[col++]);
+		// str_to_number(mob_table->bDeathBlowPoint, data[col++]);
+		// str_to_number(mob_table->bRevivePoint, data[col++]);
+
+		// //?A?�� vnum ?���Ƣ�
+		// vnumSet.insert(mob_table->dwVnum);
+		
+		
+		// //fprintf(stderr, "MOB #%d %s %s level: %u rank: %u empire: %d\n", mob_table->dwVnum, mob_table->szName, mob_table->szLocaleName, mob_table->bLevel, mob_table->bRank, mob_table->bEmpire);
+		// sys_log(0, "MOB #%-5d %-24s %-24s level: %-3u rank: %u empire: %d", mob_table->dwVnum, mob_table->szName, mob_table->szLocaleName, mob_table->bLevel, mob_table->bRank, mob_table->bEmpire);
+		// ++mob_table;
+	// }
+	// fprintf(stderr," Complete! %d/%d Mobs loaded.\r\n",size,vnumSet.size());
+	// sort(m_vec_mobTable.begin(), m_vec_mobTable.end(), FCompareVnum());
+	// return true;
+
+// }
+
+
+/***************************************
+LEER ITEM_PROTO DESDE el .TXT
+****************************************/
+bool CClientManager::InitializeItemTable()
+{
+	//================== ÇÔ¼ö ¼³¸í ==================//
+	//1. ¿ä¾à : 'item_proto.txt', 'item_proto_test.txt', 'item_names.txt' ÆÄÀÏÀ» ÀÐ°í,
+	//		<item_table>(TItemTable), <m_map_itemTableByVnum> ¿ÀºêÁ§Æ®¸¦ »ý¼ºÇÑ´Ù.
+	//2. ¼ø¼­
+	//	1) 'item_names.txt' ÆÄÀÏÀ» ÀÐ¾î¼­ (a)[localMap](vnum:name) ¸ÊÀ» ¸¸µç´Ù.
+	//	2) 'item_proto_text.txt'ÆÄÀÏ°ú (a)[localMap] ¸ÊÀ¸·Î
+	//		(b)[test_map_itemTableByVnum](vnum:TItemTable) ¸ÊÀ» »ý¼ºÇÑ´Ù.
+	//	3) 'item_proto.txt' ÆÄÀÏ°ú  (a)[localMap] ¸ÊÀ¸·Î
+	//		(!)[item_table], <m_map_itemTableByVnum>À» ¸¸µç´Ù.
+	//			<Âü°í>
+	//			°¢ row µé Áß, 
+	//			(b)[test_map_itemTableByVnum],(!)[mob_table] ¸ðµÎ¿¡ ÀÖ´Â row´Â
+	//			(b)[test_map_itemTableByVnum]ÀÇ °ÍÀ» »ç¿ëÇÑ´Ù.
+	//	4) (b)[test_map_itemTableByVnum]ÀÇ rowÁß, (!)[item_table]¿¡ ¾ø´Â °ÍÀ» Ãß°¡ÇÑ´Ù.
+	//3. Å×½ºÆ®
+	//	1)'item_proto.txt' Á¤º¸°¡ item_table¿¡ Àß µé¾î°¬´ÂÁö. -> ¿Ï·á
+	//	2)'item_names.txt' Á¤º¸°¡ item_table¿¡ Àß µé¾î°¬´ÂÁö.
+	//	3)'item_proto_test.txt' ¿¡¼­ [°ãÄ¡´Â] Á¤º¸°¡ item_table ¿¡ Àß µé¾î°¬´ÂÁö.
+	//	4)'item_proto_test.txt' ¿¡¼­ [»õ·Î¿î] Á¤º¸°¡ item_table ¿¡ Àß µé¾î°¬´ÂÁö.
+	//	5) (ÃÖÁ¾) °ÔÀÓ Å¬¶óÀÌ¾ðÆ®¿¡¼­ Á¦´ë·Î ÀÛµ¿ ÇÏ´ÂÁö.
+	//_______________________________________________//
+
+
+
+	//=================================================================================//
+	//	1) 'item_names.txt' ÆÄÀÏÀ» ÀÐ¾î¼­ (a)[localMap](vnum:name) ¸ÊÀ» ¸¸µç´Ù.
+	//=================================================================================//
+	bool isNameFile = true;
+	map<int,const char*> localMap;
+	cCsvTable nameData;
+	if(!nameData.Load("item_names.txt",'\t'))
+	{
+		fprintf(stderr, "item_names.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
+		isNameFile = false;
+	} else {
+		nameData.Next();
+		while(nameData.Next()) {
+			localMap[atoi(nameData.AsStringByIndex(0))] = nameData.AsStringByIndex(1);
+		}
+	}
+	//_________________________________________________________________//
+
+	//=================================================================//
+	//	2) 'item_proto_text.txt'ÆÄÀÏ°ú (a)[localMap] ¸ÊÀ¸·Î
+	//		(b)[test_map_itemTableByVnum](vnum:TItemTable) ¸ÊÀ» »ý¼ºÇÑ´Ù.
+	//=================================================================//
+	map<DWORD, TItemTable *> test_map_itemTableByVnum;
+	//1. ÆÄÀÏ ÀÐ¾î¿À±â.
+	cCsvTable test_data;
+	if(!test_data.Load("item_proto_test.txt",'\t'))
+	{
+		fprintf(stderr, "item_proto_test.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
+		//return false;
+	} else {
+		test_data.Next();	//¼³¸í ·Î¿ì ³Ñ¾î°¡±â.
+
+		//2. Å×½ºÆ® ¾ÆÀÌÅÛ Å×ÀÌºí »ý¼º.
+		TItemTable * test_item_table = NULL;
+		int test_itemTableSize = test_data.m_File.GetRowCount()-1;
+		test_item_table = new TItemTable[test_itemTableSize];
+		memset(test_item_table, 0, sizeof(TItemTable) * test_itemTableSize);
+
+		//3. Å×½ºÆ® ¾ÆÀÌÅÛ Å×ÀÌºí¿¡ °ªÀ» ³Ö°í, ¸Ê¿¡±îÁö ³Ö±â.
+		while(test_data.Next()) {
+
+
+			if (!Set_Proto_Item_Table(test_item_table, test_data, localMap))
+			{
+				fprintf(stderr, "¾ÆÀÌÅÛ ÇÁ·ÎÅä Å×ÀÌºí ¼ÂÆÃ ½ÇÆÐ.\n");			
+			}
+
+			test_map_itemTableByVnum.insert(std::map<DWORD, TItemTable *>::value_type(test_item_table->dwVnum, test_item_table));
+			test_item_table++;
+
+		}
+	}
+	//______________________________________________________________________//
+
+
+	//========================================================================//
+	//	3) 'item_proto.txt' ÆÄÀÏ°ú  (a)[localMap] ¸ÊÀ¸·Î
+	//		(!)[item_table], <m_map_itemTableByVnum>À» ¸¸µç´Ù.
+	//			<Âü°í>
+	//			°¢ row µé Áß, 
+	//			(b)[test_map_itemTableByVnum],(!)[mob_table] ¸ðµÎ¿¡ ÀÖ´Â row´Â
+	//			(b)[test_map_itemTableByVnum]ÀÇ °ÍÀ» »ç¿ëÇÑ´Ù.
+	//========================================================================//
+
+	//vnumµéÀ» ÀúÀåÇÒ ¼Â. »õ·Î¿î Å×½ºÆ® ¾ÆÀÌÅÛÀ» ÆÇº°ÇÒ¶§ »ç¿ëµÈ´Ù.
+	set<int> vnumSet;
+
+	//ÆÄÀÏ ÀÐ¾î¿À±â.
+	cCsvTable data;
+	if(!data.Load("item_proto.txt",'\t'))
+	{
+		fprintf(stderr, "item_proto.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
+		return false;
+	}
+	data.Next(); //¸Ç À­ÁÙ Á¦¿Ü (¾ÆÀÌÅÛ Ä®·³À» ¼³¸íÇÏ´Â ºÎºÐ)
+
+	if (!m_vec_itemTable.empty())
+	{
+		sys_log(0, "RELOAD: item_proto");
+		m_vec_itemTable.clear();
+		m_map_itemTableByVnum.clear();
+	}
+
+	//===== ¾ÆÀÌÅÛ Å×ÀÌºí »ý¼º =====//
+	//»õ·Î Ãß°¡µÇ´Â °¹¼ö¸¦ ÆÄ¾ÇÇÑ´Ù.
+	int addNumber = 0;
+	while(data.Next()) {
+		int vnum = atoi(data.AsStringByIndex(0));
+		std::map<DWORD, TItemTable *>::iterator it_map_itemTable;
+		it_map_itemTable = test_map_itemTableByVnum.find(vnum);
+		if(it_map_itemTable != test_map_itemTableByVnum.end()) {
+			addNumber++;
+		}
+	}
+	//data¸¦ ´Ù½Ã Ã¹ÁÙ·Î ¿Å±ä´Ù.(´Ù½Ã ÀÐ¾î¿Â´Ù;;)
+	data.Destroy();
+	if(!data.Load("item_proto.txt",'\t'))
+	{
+		fprintf(stderr, "item_proto.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
+		return false;
+	}
+	data.Next(); //¸Ç À­ÁÙ Á¦¿Ü (¾ÆÀÌÅÛ Ä®·³À» ¼³¸íÇÏ´Â ºÎºÐ)
+
+	m_vec_itemTable.resize(data.m_File.GetRowCount() - 1 + addNumber);
+	memset(&m_vec_itemTable[0], 0, sizeof(TItemTable) * m_vec_itemTable.size());
+	int testValue =  m_vec_itemTable.size();
+
+	TItemTable * item_table = &m_vec_itemTable[0];
+
+	while (data.Next())
+	{
+		int col = 0;
+
+		std::map<DWORD, TItemTable *>::iterator it_map_itemTable;
+		it_map_itemTable = test_map_itemTableByVnum.find(atoi(data.AsStringByIndex(col)));
+		if(it_map_itemTable == test_map_itemTableByVnum.end()) {
+			//°¢ Ä®·³ µ¥ÀÌÅÍ ÀúÀå
+			
+			if (!Set_Proto_Item_Table(item_table, data, localMap))
+			{
+				fprintf(stderr, "¾ÆÀÌÅÛ ÇÁ·ÎÅä Å×ÀÌºí ¼ÂÆÃ ½ÇÆÐ.\n");			
+			}
+
+
+			
+		} else {	//$$$$$$$$$$$$$$$$$$$$$$$ Å×½ºÆ® ¾ÆÀÌÅÛ Á¤º¸°¡ ÀÖ´Ù!	
+			TItemTable *tempTable = it_map_itemTable->second;
+
+			item_table->dwVnum = tempTable->dwVnum;
+			strlcpy(item_table->szName, tempTable->szName, sizeof(item_table->szName));
+			strlcpy(item_table->szLocaleName, tempTable->szLocaleName, sizeof(item_table->szLocaleName));
+			item_table->bType = tempTable->bType;
+			item_table->bSubType = tempTable->bSubType;
+			item_table->bSize = tempTable->bSize;
+			item_table->dwAntiFlags = tempTable->dwAntiFlags;
+			item_table->dwFlags = tempTable->dwFlags;
+			item_table->dwWearFlags = tempTable->dwWearFlags;
+			item_table->dwImmuneFlag = tempTable->dwImmuneFlag;
+			item_table->dwGold = tempTable->dwGold;
+			item_table->dwShopBuyPrice = tempTable->dwShopBuyPrice;
+			item_table->dwRefinedVnum =tempTable->dwRefinedVnum;
+			item_table->wRefineSet =tempTable->wRefineSet;
+			item_table->bAlterToMagicItemPct = tempTable->bAlterToMagicItemPct;
+			item_table->cLimitRealTimeFirstUseIndex = -1;
+			item_table->cLimitTimerBasedOnWearIndex = -1;
+
+			int i;
+
+			for (i = 0; i < ITEM_LIMIT_MAX_NUM; ++i)
+			{
+				item_table->aLimits[i].bType = tempTable->aLimits[i].bType;
+				item_table->aLimits[i].lValue = tempTable->aLimits[i].lValue;
+
+				if (LIMIT_REAL_TIME_START_FIRST_USE == item_table->aLimits[i].bType)
+					item_table->cLimitRealTimeFirstUseIndex = (char)i;
+
+				if (LIMIT_TIMER_BASED_ON_WEAR == item_table->aLimits[i].bType)
+					item_table->cLimitTimerBasedOnWearIndex = (char)i;
+			}
+
+			for (i = 0; i < ITEM_APPLY_MAX_NUM; ++i)
+			{
+				item_table->aApplies[i].bType = tempTable->aApplies[i].bType;
+				item_table->aApplies[i].lValue = tempTable->aApplies[i].lValue;
+			}
+
+			for (i = 0; i < ITEM_VALUES_MAX_NUM; ++i)
+				item_table->alValues[i] = tempTable->alValues[i];
+
+			item_table->bGainSocketPct = tempTable->bGainSocketPct;
+			item_table->sAddonType = tempTable->sAddonType;
+
+			item_table->bWeight  = tempTable->bWeight;
+
+		}
+		vnumSet.insert(item_table->dwVnum);
+		m_map_itemTableByVnum.insert(std::map<DWORD, TItemTable *>::value_type(item_table->dwVnum, item_table));
+		++item_table;
+	}
+	//_______________________________________________________________________//
+
+	//========================================================================//
+	//	4) (b)[test_map_itemTableByVnum]ÀÇ rowÁß, (!)[item_table]¿¡ ¾ø´Â °ÍÀ» Ãß°¡ÇÑ´Ù.
+	//========================================================================//
+	test_data.Destroy();
+	if(!test_data.Load("item_proto_test.txt",'\t'))
+	{
+		fprintf(stderr, "item_proto_test.txt ÆÄÀÏÀ» ÀÐ¾î¿ÀÁö ¸øÇß½À´Ï´Ù\n");
+		//return false;
+	} else {
+		test_data.Next();	//¼³¸í ·Î¿ì ³Ñ¾î°¡±â.
+
+		while (test_data.Next())	//Å×½ºÆ® µ¥ÀÌÅÍ °¢°¢À» ÈÈ¾î³ª°¡¸ç,»õ·Î¿î °ÍÀ» Ãß°¡ÇÑ´Ù.
+		{
+			//Áßº¹µÇ´Â ºÎºÐÀÌ¸é ³Ñ¾î°£´Ù.
+			set<int>::iterator itVnum;
+			itVnum=vnumSet.find(atoi(test_data.AsStringByIndex(0)));
+			if (itVnum != vnumSet.end()) {
+				continue;
+			}
+			
+			if (!Set_Proto_Item_Table(item_table, test_data, localMap))
+			{
+				fprintf(stderr, "¾ÆÀÌÅÛ ÇÁ·ÎÅä Å×ÀÌºí ¼ÂÆÃ ½ÇÆÐ.\n");			
+			}
+
+
+			m_map_itemTableByVnum.insert(std::map<DWORD, TItemTable *>::value_type(item_table->dwVnum, item_table));
+
+			item_table++;
+
+		}
+	}
+
+
+
+	// QUEST_ITEM_PROTO_DISABLE
+	// InitializeQuestItemTable();
+	// END_OF_QUEST_ITEM_PROTO_DISABLE
+
+	m_map_itemTableByVnum.clear();
+
+	itertype(m_vec_itemTable) it = m_vec_itemTable.begin();
+
+	while (it != m_vec_itemTable.end())
+	{
+		TItemTable * item_table = &(*(it++));
+
+		sys_log(1, "ITEM: #%-5lu %-24s %-24s VAL: %ld %ld %ld %ld %ld %ld WEAR %lu ANTI %lu IMMUNE %lu REFINE %lu REFINE_SET %u MAGIC_PCT %u", 
+				item_table->dwVnum,
+				item_table->szName,
+				item_table->szLocaleName,
+				item_table->alValues[0],
+				item_table->alValues[1],
+				item_table->alValues[2],
+				item_table->alValues[3],
+				item_table->alValues[4],
+				item_table->alValues[5],
+				item_table->dwWearFlags,
+				item_table->dwAntiFlags,
+				item_table->dwImmuneFlag,
+				item_table->dwRefinedVnum,
+				item_table->wRefineSet,
+				item_table->bAlterToMagicItemPct);
+
+		m_map_itemTableByVnum.insert(std::map<DWORD, TItemTable *>::value_type(item_table->dwVnum, item_table));
+	}
+	sort(m_vec_itemTable.begin(), m_vec_itemTable.end(), FCompareVnum());
+	return true;
+}
+
+/***************************************
+LEER ITEM_PROTO DESDE LA BASE DE DATOS
+****************************************/
+ // bool CClientManager::InitializeItemTable()
+    // {
+            // char query[2048];
+            // fprintf(stderr,"Loading item_proto from MySQL");
+            // snprintf(query, sizeof(query),
+            // "SELECT vnum,name,%s,type,subtype,weight,size,antiflag,flag,wearflag,immuneflag+0,gold,shop_buy_price,refined_vnum,"
+            // "refine_set,magic_pct,limittype0,limitvalue0,limittype1,limitvalue1,applytype0,applyvalue0,"
+            // "applytype1,applyvalue1,applytype2,applyvalue2,value0,value1,value2,value3,value4,value5,socket_pct,addon_type FROM item_proto%s  ORDER BY vnum",
+            // g_stLocaleNameColumn.c_str(),
+            // GetTablePostfix());
      
-            std::auto_ptr<SQLMsg> pkMsg(CDBManager::instance().DirectQuery(query));
-            SQLResult * pRes = pkMsg->Get();
+            // std::auto_ptr<SQLMsg> pkMsg(CDBManager::instance().DirectQuery(query));
+            // SQLResult * pRes = pkMsg->Get();
      
-            if (!pRes->uiNumRows)
-                    return false;
-            int addNumber = pRes->uiNumRows;
-            if (!m_vec_itemTable.empty())
-            {
-                    sys_log(0, "RELOAD: item_proto");
-                    m_vec_itemTable.clear();
-                    m_map_itemTableByVnum.clear();
-            }
+            // if (!pRes->uiNumRows)
+                    // return false;
+            // int addNumber = pRes->uiNumRows;
+            // if (!m_vec_itemTable.empty())
+            // {
+                    // sys_log(0, "RELOAD: item_proto");
+                    // m_vec_itemTable.clear();
+                    // m_map_itemTableByVnum.clear();
+            // }
      
-            m_vec_itemTable.resize(addNumber-1);
-            memset(&m_vec_itemTable[0], 0, sizeof(TItemTable) * m_vec_itemTable.size());
-            TItemTable * item_table = &m_vec_itemTable[0];
+            // m_vec_itemTable.resize(addNumber-1);
+            // memset(&m_vec_itemTable[0], 0, sizeof(TItemTable) * m_vec_itemTable.size());
+            // TItemTable * item_table = &m_vec_itemTable[0];
      
-            MYSQL_ROW data;
-            //return true;
-            set<int> vnumSet;
-            while ((data = mysql_fetch_row(pRes->pSQLResult)))
-            {
-                    str_to_number(item_table->dwVnum, data[0]);
-                    strlcpy(item_table->szName,data[1] , sizeof(item_table->szName));
-                    strlcpy(item_table->szLocaleName, data[2], sizeof(item_table->szLocaleName));
-                    str_to_number(item_table->bType, data[3]);
-                    str_to_number(item_table->bSubType, data[4]);
-                    str_to_number(item_table->bWeight, data[5]);
-                    str_to_number(item_table->bSize, data[6]);
-                    str_to_number(item_table->dwAntiFlags, data[7]);
-                    str_to_number(item_table->dwFlags, data[8]);
-                    str_to_number(item_table->dwWearFlags, data[9]);
-                    str_to_number(item_table->dwImmuneFlag, data[10]);
-                    str_to_number(item_table->dwGold, data[11]);
-                    str_to_number(item_table->dwShopBuyPrice, data[12]);
-                    str_to_number(item_table->dwRefinedVnum, data[13]);
-                    str_to_number(item_table->wRefineSet, data[14]);
-                    str_to_number(item_table->bAlterToMagicItemPct, data[15]);
-                    item_table->cLimitRealTimeFirstUseIndex = -1;
-                    item_table->cLimitTimerBasedOnWearIndex = -1;
+            // MYSQL_ROW data;
+            // //return true;
+            // set<int> vnumSet;
+            // while ((data = mysql_fetch_row(pRes->pSQLResult)))
+            // {
+                    // str_to_number(item_table->dwVnum, data[0]);
+                    // strlcpy(item_table->szName,data[1] , sizeof(item_table->szName));
+                    // strlcpy(item_table->szLocaleName, data[2], sizeof(item_table->szLocaleName));
+                    // str_to_number(item_table->bType, data[3]);
+                    // str_to_number(item_table->bSubType, data[4]);
+                    // str_to_number(item_table->bWeight, data[5]);
+                    // str_to_number(item_table->bSize, data[6]);
+                    // str_to_number(item_table->dwAntiFlags, data[7]);
+                    // str_to_number(item_table->dwFlags, data[8]);
+                    // str_to_number(item_table->dwWearFlags, data[9]);
+                    // str_to_number(item_table->dwImmuneFlag, data[10]);
+                    // str_to_number(item_table->dwGold, data[11]);
+                    // str_to_number(item_table->dwShopBuyPrice, data[12]);
+                    // str_to_number(item_table->dwRefinedVnum, data[13]);
+                    // str_to_number(item_table->wRefineSet, data[14]);
+                    // str_to_number(item_table->bAlterToMagicItemPct, data[15]);
+                    // item_table->cLimitRealTimeFirstUseIndex = -1;
+                    // item_table->cLimitTimerBasedOnWearIndex = -1;
                    
-                    str_to_number(item_table->aLimits[0].bType, data[16]);
-                    str_to_number(item_table->aLimits[0].lValue, data[17]);
-                    if (LIMIT_REAL_TIME_START_FIRST_USE == item_table->aLimits[0].bType)
-                            item_table->cLimitRealTimeFirstUseIndex = (char)0;
-                    if (LIMIT_TIMER_BASED_ON_WEAR == item_table->aLimits[0].bType)
-                            item_table->cLimitTimerBasedOnWearIndex = (char)0;
+                    // str_to_number(item_table->aLimits[0].bType, data[16]);
+                    // str_to_number(item_table->aLimits[0].lValue, data[17]);
+                    // if (LIMIT_REAL_TIME_START_FIRST_USE == item_table->aLimits[0].bType)
+                            // item_table->cLimitRealTimeFirstUseIndex = (char)0;
+                    // if (LIMIT_TIMER_BASED_ON_WEAR == item_table->aLimits[0].bType)
+                            // item_table->cLimitTimerBasedOnWearIndex = (char)0;
                            
-                    str_to_number(item_table->aLimits[1].bType, data[18]);
-                    str_to_number(item_table->aLimits[1].lValue, data[19]);
-                    if (LIMIT_REAL_TIME_START_FIRST_USE == item_table->aLimits[1].bType)
-                            item_table->cLimitRealTimeFirstUseIndex = (char)1;
-                    if (LIMIT_TIMER_BASED_ON_WEAR == item_table->aLimits[1].bType)
-                            item_table->cLimitTimerBasedOnWearIndex = (char)1;
+                    // str_to_number(item_table->aLimits[1].bType, data[18]);
+                    // str_to_number(item_table->aLimits[1].lValue, data[19]);
+                    // if (LIMIT_REAL_TIME_START_FIRST_USE == item_table->aLimits[1].bType)
+                            // item_table->cLimitRealTimeFirstUseIndex = (char)1;
+                    // if (LIMIT_TIMER_BASED_ON_WEAR == item_table->aLimits[1].bType)
+                            // item_table->cLimitTimerBasedOnWearIndex = (char)1;
                    
      
-                    str_to_number(item_table->aApplies[0].bType, data[20]);
-                    str_to_number(item_table->aApplies[0].lValue, data[21]);
+                    // str_to_number(item_table->aApplies[0].bType, data[20]);
+                    // str_to_number(item_table->aApplies[0].lValue, data[21]);
                    
-                    str_to_number(item_table->aApplies[1].bType, data[22]);
-                    str_to_number(item_table->aApplies[1].lValue, data[23]);
+                    // str_to_number(item_table->aApplies[1].bType, data[22]);
+                    // str_to_number(item_table->aApplies[1].lValue, data[23]);
                    
-                    str_to_number(item_table->aApplies[2].bType, data[24]);
-                    str_to_number(item_table->aApplies[2].lValue, data[25]);
+                    // str_to_number(item_table->aApplies[2].bType, data[24]);
+                    // str_to_number(item_table->aApplies[2].lValue, data[25]);
                    
      
-                    str_to_number(item_table->alValues[0], data[26]);
-                    str_to_number(item_table->alValues[1], data[27]);
-                    str_to_number(item_table->alValues[2], data[28]);
-                    str_to_number(item_table->alValues[3], data[29]);
-                    str_to_number(item_table->alValues[4], data[30]);
-			str_to_number(item_table->alValues[5], data[31]);
+                    // str_to_number(item_table->alValues[0], data[26]);
+                    // str_to_number(item_table->alValues[1], data[27]);
+                    // str_to_number(item_table->alValues[2], data[28]);
+                    // str_to_number(item_table->alValues[3], data[29]);
+                    // str_to_number(item_table->alValues[4], data[30]);
+			// str_to_number(item_table->alValues[5], data[31]);
                            
-                    str_to_number(item_table->bGainSocketPct, data[32]);
-                    str_to_number(item_table->sAddonType, data[33]);
+                    // str_to_number(item_table->bGainSocketPct, data[32]);
+                    // str_to_number(item_table->sAddonType, data[33]);
 			
      
-                    vnumSet.insert(item_table->dwVnum);
-                    m_map_itemTableByVnum.insert(std::map<DWORD, TItemTable *>::value_type(item_table->dwVnum, item_table));
-                    sys_log(0, "ITEM: #%-5lu %-24s %-24s VAL: %d %ld %d %d %d %d WEAR %d ANTI %d IMMUNE %d REFINE %lu REFINE_SET %u MAGIC_PCT %u",
-                                    item_table->dwVnum,
-                                    item_table->szName,
-                                    item_table->szLocaleName,
-                                    item_table->alValues[0],
-                                    item_table->alValues[1],
-                                    item_table->alValues[2],
-                                    item_table->alValues[3],
-                                    item_table->alValues[4],
-                                    item_table->alValues[5],
-                                    item_table->dwWearFlags,
-                                    item_table->dwAntiFlags,
-                                    item_table->dwImmuneFlag,
-                                    item_table->dwRefinedVnum,
-                                    item_table->wRefineSet,
-                                    item_table->bAlterToMagicItemPct);
+                    // vnumSet.insert(item_table->dwVnum);
+                    // m_map_itemTableByVnum.insert(std::map<DWORD, TItemTable *>::value_type(item_table->dwVnum, item_table));
+                    // sys_log(0, "ITEM: #%-5lu %-24s %-24s VAL: %d %ld %d %d %d %d WEAR %d ANTI %d IMMUNE %d REFINE %lu REFINE_SET %u MAGIC_PCT %u",
+                                    // item_table->dwVnum,
+                                    // item_table->szName,
+                                    // item_table->szLocaleName,
+                                    // item_table->alValues[0],
+                                    // item_table->alValues[1],
+                                    // item_table->alValues[2],
+                                    // item_table->alValues[3],
+                                    // item_table->alValues[4],
+                                    // item_table->alValues[5],
+                                    // item_table->dwWearFlags,
+                                    // item_table->dwAntiFlags,
+                                    // item_table->dwImmuneFlag,
+                                    // item_table->dwRefinedVnum,
+                                    // item_table->wRefineSet,
+                                    // item_table->bAlterToMagicItemPct);
      
-                    item_table++;
-            }
-            fprintf(stderr," Complete! %d Items loaded.\r\n",addNumber);
-            return true;
+                    // item_table++;
+            // }
+            // fprintf(stderr," Complete! %d Items loaded.\r\n",addNumber);
+            // return true;
      
-    }
+    // }
 
 
 bool CClientManager::InitializeSkillTable()

@@ -1293,7 +1293,6 @@ class CHARACTER : public CEntity, public CFSM, public CHorseRider
 		// HACK
 		// 
 	public:
-		void QuerySafeboxSize();
 		void SetComboSequence(BYTE seq);
 		BYTE GetComboSequence() const;
 
@@ -1503,10 +1502,7 @@ class CHARACTER : public CEntity, public CFSM, public CHorseRider
 		// Safebox
 	public:
 		int					GetSafeboxSize() const;
-		void				
-			
-			
-			SafeboxSize();
+		void				QuerySafeboxSize();
 		void				SetSafeboxSize(int size);
 
 		CSafebox *			GetSafebox() const;

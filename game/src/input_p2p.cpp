@@ -217,6 +217,10 @@ struct FuncShout
 
 	void operator () (LPDESC d)
 	{
+		/*******************
+			GLOBAL CHAT
+		*******************/
+		//if (!d->GetCharacter() || (d->GetCharacter()->GetGMLevel() == GM_PLAYER && d->GetEmpire() != m_bEmpire))
 		if (!d->GetCharacter() /*|| (d->GetCharacter()->GetGMLevel() == GM_PLAYER && d->GetEmpire() != m_bEmpire)*/)
 
 			return;

@@ -567,6 +567,10 @@ bool CHARACTER::IsEmptyItemGrid(TItemPos Cell, BYTE bSize, int iExceptionCell) c
 						return true;
 
 					int j = 1;
+					//BYTE bPage = bCell / (INVENTORY_MAX_NUM / 2);
+					/*********************
+					Inventario 4 paginas
+					*********************/
 					BYTE bPage = bCell / (INVENTORY_MAX_NUM / 4);
 
 					do
@@ -575,6 +579,11 @@ bool CHARACTER::IsEmptyItemGrid(TItemPos Cell, BYTE bSize, int iExceptionCell) c
 
 						if (p >= INVENTORY_MAX_NUM)
 							return false;
+						//if (p / (INVENTORY_MAX_NUM / 2) != bPage)
+						//	return false;
+						/*********************
+						Inventario 4 paginas
+						*********************/
 
 						if (p / (INVENTORY_MAX_NUM / 4) != bPage)
 							return false;
@@ -597,6 +606,10 @@ bool CHARACTER::IsEmptyItemGrid(TItemPos Cell, BYTE bSize, int iExceptionCell) c
 			else
 			{
 				int j = 1;
+				//BYTE bPage = bCell / (INVENTORY_MAX_NUM / 2);
+				/*********************
+				Inventario 4 paginas
+				*********************/
 				BYTE bPage = bCell / (INVENTORY_MAX_NUM / 4);
 
 				do
@@ -604,8 +617,12 @@ bool CHARACTER::IsEmptyItemGrid(TItemPos Cell, BYTE bSize, int iExceptionCell) c
 					BYTE p = bCell + (5 * j);
 
 					if (p >= INVENTORY_MAX_NUM)
-						return false;
-
+						return false;				
+					//if (p / (INVENTORY_MAX_NUM / 2) != bPage)
+						//	return false;
+					/*********************
+					Inventario 4 paginas
+					*********************/
 					if (p / (INVENTORY_MAX_NUM / 4) != bPage)
 						return false;
 
@@ -5526,7 +5543,8 @@ bool CHARACTER::MoveItem(TItemPos Cell, TItemPos DestCell, BYTE count)
 	// 기획자의 요청으로 벨트 인벤토리에는 특정 타입의 아이템만 넣을 수 있다.
 	if (DestCell.IsBeltInventoryPosition() && false == CBeltInventoryHelper::CanMoveIntoBeltInventory(item))
 	{
-		ChatPacket(CHAT_TYPE_INFO, LC_TEXT("이 아이템은 벨트 인벤토리로 옮길 수 없습니다."));			
+		ChatPacket(CHAT_TYPE_INFO, "No puedes poner este objeto en el sistema de cinturon ");
+		//ChatPacket(CHAT_TYPE_INFO, LC_TEXT("이 아이템은 벨트 인벤토리로 옮길 수 없습니다."));			
 		return false;
 	}
 

@@ -299,6 +299,9 @@ bool CExchange::Check(int * piItemCount)
 
 bool CExchange::CheckSpace()
 {
+	/*****************************
+	   Inventario 4 Paginas
+	*****************************/
 	static CGrid s_grid1(5, INVENTORY_MAX_NUM / 5 / 2); // inven page 1
 	static CGrid s_grid2(5, INVENTORY_MAX_NUM / 5 / 2); // inven page 2
 	static CGrid s_grid3(5, INVENTORY_MAX_NUM / 5 / 2); // inven page 3
@@ -343,6 +346,36 @@ bool CExchange::CheckSpace()
 
 		s_grid4.Put(i - INVENTORY_MAX_NUM / 4, 1, item->GetSize());
 	}
+	
+	/*****************************
+	   Inventario 2 Paginas (Normal)
+	*****************************/
+	/*static CGrid s_grid1(5, INVENTORY_MAX_NUM/5 / 2); // inven page 1
+	static CGrid s_grid2(5, INVENTORY_MAX_NUM/5 / 2); // inven page 2
+
+	s_grid1.Clear();
+	s_grid2.Clear();
+
+	LPCHARACTER	victim = GetCompany()->GetOwner();
+	LPITEM item;
+
+	int i;
+
+	for (i = 0; i < INVENTORY_MAX_NUM / 2; ++i)
+	{
+		if (!(item = victim->GetInventoryItem(i)))
+			continue;
+
+		s_grid1.Put(i, 1, item->GetSize());
+	}
+	for (i = INVENTORY_MAX_NUM / 2; i < INVENTORY_MAX_NUM; ++i)
+	{
+		if (!(item = victim->GetInventoryItem(i)))
+			continue;
+
+		s_grid2.Put(i - INVENTORY_MAX_NUM / 2, 1, item->GetSize());
+	}
+	*/
 
 	// 아... 뭔가 개병신 같지만... 용혼석 인벤을 노멀 인벤 보고 따라 만든 내 잘못이다 ㅠㅠ
 	static std::vector <WORD> s_vDSGrid(DRAGON_SOUL_INVENTORY_MAX_NUM);

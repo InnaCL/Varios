@@ -253,10 +253,28 @@ bool CHARACTER::IsImmune(DWORD dwImmuneFlag)
 {
 	if (IS_SET(m_pointsInstant.dwImmuneFlag, dwImmuneFlag))
 	{
-		if (test_server && IsPC())
-			ChatPacket(CHAT_TYPE_PARTY, "<IMMUNE_SUCCESS> (%s)", GetName());
+		/*****************************************************
+							Inmune apagon 100%
+		******************************************************/
+		
+		//int immune_pct = 90;
+		int immune_pct = 100; 
+		int	percent = number(1, 100);
 
-		return true;
+		if (percent <= immune_pct)	// 90% Immune
+		{
+			if (test_server && IsPC())
+				ChatPacket(CHAT_TYPE_PARTY, "<IMMUNE_SUCCESS> (%s)", GetName()); 
+
+			return true;
+		}
+		else
+		{
+			if (test_server && IsPC())
+				ChatPacket(CHAT_TYPE_PARTY, "<IMMUNE_FAIL> (%s)", GetName());
+
+			return false;
+		}
 	}
 
 	if (test_server && IsPC())
@@ -264,4 +282,3 @@ bool CHARACTER::IsImmune(DWORD dwImmuneFlag)
 
 	return false;
 }
-

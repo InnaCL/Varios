@@ -445,9 +445,14 @@ typedef struct SPlayerTable
 
 	long	lExitX, lExitY;
 	long	lExitMapIndex;
-
-	short       hp;
-	short       sp;
+	/***************************
+		HP Portales Arreglado
+	****************************/
+	
+	//short       hp;
+	//short       sp;	
+	int       hp;
+	int       sp;	
 
 	short	sRandomHP;
 	short	sRandomSP;
