@@ -163,7 +163,8 @@ bool CMonarch::TakeMoney(int Empire, DWORD pid, int64_t Money)
 
 	char szQuery[1024];	
 	snprintf(szQuery, sizeof(szQuery), 
-			"UPDATE monarch set money=%lld; where empire=%d", m_MonarchInfo.money[Empire], Empire);
+			//Arreglo para query Monarca
+			"UPDATE monarch set money=%lld where empire=%d", m_MonarchInfo.money[Empire], Empire);
 
 	CDBManager::instance().AsyncQuery(szQuery);
 
