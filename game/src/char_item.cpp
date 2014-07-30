@@ -5873,6 +5873,10 @@ bool CHARACTER::PickupItem(DWORD dwVID)
 			GetParty()->ForEachOnlineMember(funcFindOwnership);
 
 			LPCHARACTER owner = funcFindOwnership.owner;
+			
+			//Con esto evitamos drophack
+			if (!owner) 
+				return false;
 
 			int iEmptyCell;
 
