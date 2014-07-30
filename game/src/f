@@ -1,0 +1,4 @@
+echo "write something:"
+read smtg
+grep "$smtg" *.h *.cpp ../../common/*.h
+
